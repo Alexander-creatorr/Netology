@@ -1,0 +1,77 @@
+services:
+  # Elasticsearch Docker Images: https://www.docker.elastic.co/
+  elasticsearch:
+    image: elasticsearch:${STACK_VERSION}
+    container_name: ${CONTAINER_NAME}
+    environment:
+      - cluster.name=${CLUSTER_NAME}
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    mem_limit: ${ES_MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - "./elasticsearch-data:/usr/share/elasticsearch/data"
+    ports:
+      - ${ES_PORT}:9200
+
+  kibana:
+    container_name: kibana
+    image: kibana:${STACK_VERSION}
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTIC_HOST}
+    ports:
+      - ${KIBANA_PORT}:5601
+    mem_limit: ${KB_MEM_LIMIT}
+    depends_on:
+      - elasticsearch
+
+  # logstash:
+  #  image: logstash:${STACK_VERSION}
+  #  labels:
+  #    co.elastic.logs/module: logstash
+  #  volumes:
+  #    - "./logstashdata:/usr/share/logstash/data"
+  #    - "./logstash_ingest_data:/usr/share/logstash/ingest_data/"
+  #    - "./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+  #    - "./nginx/log:/usr/share/logstash/nginx/log:ro"
+  #  environment:
+  #    - xpack.monitoring.enabled=false
+  #    - ELASTIC_HOSTS=${ELASTIC_HOSTS}
+  #  mem_limit: ${LS_MEM_LIMIT}
+  #  restart: on-failure
+  #  depends_on:
+  #    - elasticsearch
+  #    - nginx
+
+  nginx:
+    image: nginx:${NGINX_VERSION}
+    ports:
+      - '${NGINX_PORT}:80'
+    volumes: 
+    - "./nginx/log/access.log:/var/log/nginx/access.log"
+    - "./nginx/log/error.log:/var/log/nginx/error.log"
+
+  filebeat:
+    image: elastic/filebeat:${STACK_VERSION}
+    command: --strict.perms=false
+    environment:
+      - ELASTIC_HOSTS=${ELASTIC_HOST}
+    volumes:
+      - "./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
+      - "./nginx/log:/usr/share/logstash/nginx/log:ro"
+    depends_on:
+      - elasticsearch
+      - nginx
+
+volumes:
+  elasticsearch-data:
+  logstashdata:
+  
